@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from torch.nn import init
 import functools
+
 
 # Defines the Unet generator.
 # |num_downs|: number of downsamplings in UNet. For example,
