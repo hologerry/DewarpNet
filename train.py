@@ -31,8 +31,8 @@ def train(args):
                           split='val', img_size=(args.img_rows, args.img_cols))
 
     n_classes = train_dataset.n_classes
-    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=16, shuffle=True)
-    val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=16)
+    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=64, shuffle=True)
+    val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=64)
 
     # Setup Model
     model = get_model(args.arch, n_classes, in_channels=3)
