@@ -1,20 +1,20 @@
-import os
-from os.path import join as pjoin
 import collections
-import torch
+import os
+import random
+from os.path import join as pjoin
+
+import cv2
 import numpy as np
 import scipy.misc as m
-import cv2
-import random
-
+import torch
 from torch.utils import data
 
-from loaders.augmentationsk import data_aug, tight_crop
+from datasets.augmentationsk import data_aug, tight_crop
 
 
-class doc3dwcLoader(data.Dataset):
+class WCDataset(data.Dataset):
     """
-    Loader for world coordinate regression and RGB images
+    Dataset for RGB Image -> World Coordinate (3D coordinate)
     """
 
     def __init__(self, root, split='train', is_transform=False,
@@ -25,8 +25,7 @@ class doc3dwcLoader(data.Dataset):
         self.augmentations = augmentations
         self.n_classes = 3
         self.files = collections.defaultdict(list)
-        self.img_size = img_size if isinstance(
-            img_size, tuple) else (img_size, img_size)
+        self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
 
         for split in ['train', 'val']:
             path = pjoin(self.root, split + '.txt')

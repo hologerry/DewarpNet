@@ -1,35 +1,29 @@
-# loader for backward mapping
-# loads albedo to dewarp
-# uses crop as augmentation
-import os
-from os.path import join as pjoin
 import collections
-import torch
-import numpy as np
-import scipy.misc as m
+import random
+from os.path import join as pjoin
+
 import cv2
 import hdf5storage as h5
-import random
-
+import numpy as np
+import scipy.misc as m
+import torch
 from torch.utils import data
 
 
-class doc3dbmnoimgcLoader(data.Dataset):
+class BMDataset(data.Dataset):
     """
-    Data loader for the  semantic segmentation dataset.
+    Dataset for World Coordinate (3D coordinate) -> Backward Mapping.
     """
 
     def __init__(self, root, split='train', is_transform=False,
                  img_size=512):
-        self.root = os.path.expanduser(root)
-        self.altroot = '/root/doc3d/'
-        # self.altroot = '/media/hilab/HiLabData/Sagnik/FoldedDocumentDataset/data/DewarpNet/swat3d/'
+        self.root = root
+
         self.split = split
         self.is_transform = is_transform
         self.n_classes = 2
         self.files = collections.defaultdict(list)
-        self.img_size = img_size if isinstance(
-            img_size, tuple) else (img_size, img_size)
+        self.img_size = img_size if isinstance(img_size, tuple) else (img_size, img_size)
         for split in ['train', 'val']:
             path = pjoin(self.altroot, split + '.txt')
             file_list = tuple(open(path, 'r'))
@@ -58,8 +52,7 @@ class doc3dbmnoimgcLoader(data.Dataset):
         return im, lbl
 
     def tight_crop(self, wc, alb):
-        msk = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0)
-               & (wc[:, :, 2] != 0)).astype(np.uint8)
+        msk = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0) & (wc[:, :, 2] != 0)).astype(np.uint8)
         size = msk.shape
         [y, x] = (msk).nonzero()
         minx = min(x)
@@ -100,8 +93,7 @@ class doc3dbmnoimgcLoader(data.Dataset):
         msk = ((wc[:, :, 0] != 0) & (wc[:, :, 1] != 0) &
                (wc[:, :, 2] != 0)).astype(np.uint8)*255
         # normalize label
-        xmx, xmn, ymx, ymn, zmx, zmn = 1.2539363, - \
-            1.2442188, 1.2396319, -1.2289206, 0.6436657, -0.67492497
+        xmx, xmn, ymx, ymn, zmx, zmn = 1.2539363, -1.2442188, 1.2396319, -1.2289206, 0.6436657, -0.67492497
         wc[:, :, 0] = (wc[:, :, 0]-zmn)/(zmx-zmn)
         wc[:, :, 1] = (wc[:, :, 1]-ymn)/(ymx-ymn)
         wc[:, :, 2] = (wc[:, :, 2]-xmn)/(xmx-xmn)
@@ -132,9 +124,9 @@ class doc3dbmnoimgcLoader(data.Dataset):
 # #Leave code for debugging purposes
 # if __name__ == '__main__':
 #     local_path = './data/DewarpNet/doc3d/'
-#     bs = 4
-#     dst = doc3dbmnoimgcLoader(root=local_path, split='trainswat3dmini', is_transform=True)
-#     trainloader = data.DataLoader(dst, batch_size=bs)
+#     batch_size = 4
+#     dst = BMDataset(root=local_path, split='trainswat3dmini', is_transform=True)
+#     trainloader = data.DataLoader(dst, batch_size=batch_size)
 #     for i, data in enumerate(trainloader):
 #         imgs, labels = data
 #         imgs = imgs.numpy()

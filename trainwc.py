@@ -12,7 +12,7 @@ from torch.utils import data
 from tqdm import tqdm
 
 import grad_loss
-from loaders import get_loader
+from datasets import get_loader
 from models import get_model
 from utils import get_lr, show_wc_tnsboard
 

@@ -1,18 +1,18 @@
 # test end to end benchmark data test
-import os
-import torch
 import argparse
-import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
+import os
+
 import cv2
 import matplotlib.pyplot as plt
-
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from models import get_model
-from utils import convert_state_dict
+# from utils import convert_state_dict
 
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def unwarp(img, bm):
@@ -64,27 +64,19 @@ def test(args, img_path, fname):
     # Predict
     htan = nn.Hardtanh(0, 1.0)
     wc_model = get_model(wc_model_name, wc_n_classes, in_channels=3)
-    if DEVICE.type == 'cpu':
-        wc_state = convert_state_dict(torch.load(
-            args.wc_model_path, map_location='cpu')['model_state'])
-    else:
-        wc_state = convert_state_dict(
-            torch.load(args.wc_model_path)['model_state'])
-    wc_model.load_state_dict(wc_state)
+    wc_model_state = torch.load(args.wc_model_path, map_location=device)['model_state']
+    wc_model.load_state_dict(wc_model_state)
+
     wc_model.eval()
+
     bm_model = get_model(bm_model_name, bm_n_classes, in_channels=3)
-    if DEVICE.type == 'cpu':
-        bm_state = convert_state_dict(torch.load(
-            args.bm_model_path, map_location='cpu')['model_state'])
-    else:
-        bm_state = convert_state_dict(
-            torch.load(args.bm_model_path)['model_state'])
-    bm_model.load_state_dict(bm_state)
+    bm_model_state = torch.load(args.bm_model_path, map_location=device)['model_state']
+    bm_model.load_state_dict(bm_model_state)
     bm_model.eval()
 
-    wc_model = wc_model.to(DEVICE)
-    bm_model = bm_model.to(DEVICE)
-    images = img.to(DEVICE)
+    wc_model = wc_model.to(device)
+    bm_model = bm_model.to(device)
+    images = img.to(device)
 
     with torch.no_grad():
         wc_outputs = wc_model(images)
@@ -112,9 +104,9 @@ if __name__ == '__main__':
                         help='Path to the saved wc model')
     parser.add_argument('--bm_model_path', nargs='?', type=str, default='',
                         help='Path to the saved bm model')
-    parser.add_argument('--img_path', nargs='?', type=str, default='./eval/inp/',
+    parser.add_argument('--img_path', nargs='?', type=str, default='./eval/input/',
                         help='Path of the input image')
-    parser.add_argument('--out_path', nargs='?', type=str, default='./eval/uw/',
+    parser.add_argument('--out_path', nargs='?', type=str, default='./eval/unwarp/',
                         help='Path of the output unwarped image')
     parser.add_argument('--show', dest='show', action='store_true',
                         help='Show the input image and output unwarped')

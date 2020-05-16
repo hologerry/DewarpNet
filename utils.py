@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import random
 import torchvision
+from torchvision import utils
+import matplotlib.pyplot as plt
 
 
 def recursive_glob(rootdir='.', suffix=''):
@@ -139,84 +141,76 @@ def vistensor(tensor, epoch, ch=0, allkernels=False, nrow=8, padding=1):
         tensor = tensor[:, ch, :, :].unsqueeze(dim=1)
 
     rows = np.min((tensor.shape[0]//nrow + 1, 64))
-    # print rows
+    print(rows)
     # print tensor.shape
     grid = utils.make_grid(tensor, nrow=8, normalize=True, padding=padding)
+    utils.save_image(grid, './generated/filters_layer1_dwuv_'+str(epoch)+'.png')
     # print grid.shape
-    plt.figure(figsize=(10, 10), dpi=200)
-    plt.imshow(grid.numpy().transpose((1, 2, 0)))
-    plt.savefig('./generated/filters_layer1_dwuv_'+str(epoch)+'.png')
-    plt.close()
+    # plt.figure(figsize=(10, 10), dpi=200)
+    # plt.imshow(grid.numpy().transpose((1, 2, 0)))
+    # plt.savefig('./generated/filters_layer1_dwuv_'+str(epoch)+'.png')
+    # plt.close()
 
 
-def show_uloss(uwpred, uworg, inp_img, samples=7):
+def show_uloss(uwpred, uwgt, inp_img, samples=7):
 
     n, c, h, w = inp_img.shape
     # print(labels.shape)
     uwpred = uwpred.detach().cpu().numpy()
-    uworg = uworg.detach().cpu().numpy()
+    uwgt = uwgt.detach().cpu().numpy()
     inp_img = inp_img.detach().cpu().numpy()
 
     # NCHW->NHWC
     uwpred = uwpred.transpose((0, 2, 3, 1))
-    uworg = uworg.transpose((0, 2, 3, 1))
+    uwgt = uwgt.transpose((0, 2, 3, 1))
 
-    choices = random.sample(range(n), min(n, samples))
+    # choices = random.sample(range(n), min(n, samples))
     f, axarr = plt.subplots(samples, 3)
     for j in range(samples):
         # print(np.min(labels[j]))
         # print imgs[j].shape
         img = inp_img[j].transpose(1, 2, 0)
         axarr[j][0].imshow(img[:, :, ::-1])
-        axarr[j][1].imshow(uworg[j])
+        axarr[j][1].imshow(uwgt[j])
         axarr[j][2].imshow(uwpred[j])
 
     plt.savefig('./generated/unwarp.png')
     plt.close()
 
 
-def show_uloss_visdom(vis, uwpred, uworg, labels_win, out_win, labelopts, outopts, args):
+def show_uloss_visdom(vis, uwpred, uwgt, labels_win, out_win, labelopts, outopts, args):
     samples = 7
     n, c, h, w = uwpred.shape
     uwpred = uwpred.detach().cpu().numpy()
-    uworg = uworg.detach().cpu().numpy()
+    uwgt = uwgt.detach().cpu().numpy()
     out_arr = np.full((samples, 3, args.img_rows, args.img_cols), 0.0)
     label_arr = np.full((samples, 3, args.img_rows, args.img_cols), 0.0)
     choices = random.sample(range(n), min(n, samples))
     idx = 0
     for c in choices:
         out_arr[idx, :, :, :] = uwpred[c]
-        label_arr[idx, :, :, :] = uworg[c]
+        label_arr[idx, :, :, :] = uwgt[c]
         idx += 1
 
-    vis.images(out_arr,
-               win=out_win,
-               opts=outopts)
-    vis.images(label_arr,
-               win=labels_win,
-               opts=labelopts)
+    vis.images(out_arr, win=out_win, opts=outopts)
+    vis.images(label_arr, win=labels_win, opts=labelopts)
 
 
-def show_unwarp_tnsboard(global_step, writer, uwpred, uworg, grid_samples, gt_tag, pred_tag):
-    idxs = torch.LongTensor(random.sample(
-        range(images.shape[0]), min(grid_samples, images.shape[0])))
-    grid_uworg = torchvision.utils.make_grid(
-        uworg[idxs], normalize=True, scale_each=True)
-    writer.add_image(gt_tag, grid_uworg, global_step)
-    grid_uwpr = torchvision.utils.make_grid(
-        uwpred[idxs], normalize=True, scale_each=True)
+def show_unwarp_tnsboard(global_step, writer, images, uwpred, uwgt, grid_samples, inp_tag, pred_tag, gt_tag):
+    idxs = torch.LongTensor(random.sample(range(images.shape[0]), min(grid_samples, images.shape[0])))
+    grid_inp = torchvision.utils.make_grid(images[idxs], normalize=True, scale_each=True)
+    writer.add_image(inp_tag, grid_inp, global_step)
+    grid_uwgt = torchvision.utils.make_grid(uwgt[idxs], normalize=True, scale_each=True)
+    writer.add_image(gt_tag, grid_uwgt, global_step)
+    grid_uwpr = torchvision.utils.make_grid(uwpred[idxs], normalize=True, scale_each=True)
     writer.add_image(pred_tag, grid_uwpr, global_step)
 
 
 def show_wc_tnsboard(global_step, writer, images, labels, pred, grid_samples, inp_tag, gt_tag, pred_tag):
-    idxs = torch.LongTensor(random.sample(
-        range(images.shape[0]), min(grid_samples, images.shape[0])))
-    grid_inp = torchvision.utils.make_grid(
-        images[idxs], normalize=True, scale_each=True)
+    idxs = torch.LongTensor(random.sample(range(images.shape[0]), min(grid_samples, images.shape[0])))
+    grid_inp = torchvision.utils.make_grid(images[idxs], normalize=True, scale_each=True)
     writer.add_image(inp_tag, grid_inp, global_step)
-    grid_lbl = torchvision.utils.make_grid(
-        labels[idxs], normalize=True, scale_each=True)
+    grid_lbl = torchvision.utils.make_grid(labels[idxs], normalize=True, scale_each=True)
     writer.add_image(gt_tag, grid_lbl, global_step)
-    grid_pred = torchvision.utils.make_grid(
-        pred[idxs], normalize=True, scale_each=True)
+    grid_pred = torchvision.utils.make_grid(pred[idxs], normalize=True, scale_each=True)
     writer.add_image(pred_tag, grid_pred, global_step)

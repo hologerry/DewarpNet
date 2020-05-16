@@ -125,9 +125,9 @@ class DenseTransitionBlockDecoder(nn.Module):
 
 
 # Dense encoders and decoders for image of size 128 128
-class waspDenseEncoder128(nn.Module):
+class DenseEncoder128(nn.Module):
     def __init__(self, nc=1, ndf=32, ndim=128, activation=nn.LeakyReLU, args=[0.2, False], f_activation=nn.Tanh, f_args=[]):
-        super(waspDenseEncoder128, self).__init__()
+        super(DenseEncoder128, self).__init__()
         self.ndim = ndim
 
         self.main = nn.Sequential(
@@ -138,28 +138,23 @@ class waspDenseEncoder128(nn.Module):
 
             # state size. (ndf) x 64 x 64
             DenseBlockEncoder(ndf, 6),
-            DenseTransitionBlockEncoder(
-                ndf, ndf*2, 2, activation=activation, args=args),
+            DenseTransitionBlockEncoder(ndf, ndf*2, 2, activation=activation, args=args),
 
             # state size. (ndf*2) x 32 x 32
             DenseBlockEncoder(ndf*2, 12),
-            DenseTransitionBlockEncoder(
-                ndf*2, ndf*4, 2, activation=activation, args=args),
+            DenseTransitionBlockEncoder(ndf*2, ndf*4, 2, activation=activation, args=args),
 
             # state size. (ndf*4) x 16 x 16
             DenseBlockEncoder(ndf*4, 16),
-            DenseTransitionBlockEncoder(
-                ndf*4, ndf*8, 2, activation=activation, args=args),
+            DenseTransitionBlockEncoder(ndf*4, ndf*8, 2, activation=activation, args=args),
 
             # state size. (ndf*4) x 8 x 8
             DenseBlockEncoder(ndf*8, 16),
-            DenseTransitionBlockEncoder(
-                ndf*8, ndf*8, 2, activation=activation, args=args),
+            DenseTransitionBlockEncoder(ndf*8, ndf*8, 2, activation=activation, args=args),
 
             # state size. (ndf*8) x 4 x 4
             DenseBlockEncoder(ndf*8, 16),
-            DenseTransitionBlockEncoder(
-                ndf*8, ndim, 4, activation=activation, args=args),
+            DenseTransitionBlockEncoder(ndf*8, ndim, 4, activation=activation, args=args),
             f_activation(*f_args),
         )
 
@@ -170,9 +165,9 @@ class waspDenseEncoder128(nn.Module):
         return output
 
 
-class waspDenseDecoder128(nn.Module):
+class DenseDecoder128(nn.Module):
     def __init__(self, nz=128, nc=1, ngf=32, lb=0, ub=1, activation=nn.ReLU, args=[False], f_activation=nn.Hardtanh, f_args=[]):
-        super(waspDenseDecoder128, self).__init__()
+        super(DenseDecoder128, self).__init__()
         self.main = nn.Sequential(
             # input is Z, going into convolution
             nn.BatchNorm2d(nz),
@@ -215,24 +210,22 @@ class waspDenseDecoder128(nn.Module):
         return self.main(inputs)
 
 
-class dnetccnl(nn.Module):
+class DenseNet(nn.Module):
     # in_channels -> nc      | encoder first layer
-    # filters -> ndf    | encoder first layer
+    # filters -> ndf         | encoder first layer
     # img_size(h,w) -> ndim
     # out_channels  -> optical flow (x,y)
 
     def __init__(self, img_size=128, in_channels=1, out_channels=2, filters=32, fc_units=100):
-        super(dnetccnl, self).__init__()
+        super(DenseNet, self).__init__()
         self.nc = in_channels
         self.nf = filters
         self.ndim = img_size
         self.oc = out_channels
         self.fcu = fc_units
 
-        self.encoder = waspDenseEncoder128(
-            nc=self.nc+2, ndf=self.nf, ndim=self.ndim)
-        self.decoder = waspDenseDecoder128(
-            nz=self.ndim, nc=self.oc, ngf=self.nf)
+        self.encoder = DenseEncoder128(nc=self.nc+2, ndf=self.nf, ndim=self.ndim)
+        self.decoder = DenseDecoder128(nz=self.ndim, nc=self.oc, ngf=self.nf)
         # self.fc_layers= nn.Sequential(nn.Linear(self.ndim, self.fcu),
         #                               nn.ReLU(True),
         #                               nn.Dropout(0.25),

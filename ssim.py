@@ -5,9 +5,11 @@ import torch
 import torch.nn.functional as F
 from math import exp
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def gaussian(window_size, sigma):
-    gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
+    gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)]).to(device)
     return gauss/gauss.sum()
 
 
@@ -58,8 +60,7 @@ class SSIM(torch.nn.Module):
         else:
             window = create_window(self.window_size, channel)
 
-            if img1.is_cuda:
-                window = window.cuda(img1.get_device())
+            window = window.to(device)
             window = window.type_as(img1)
 
             self.window = window
@@ -72,8 +73,7 @@ def ssim(img1, img2, window_size=11, size_average=True):
     (_, channel, _, _) = img1.size()
     window = create_window(window_size, channel)
 
-    if img1.is_cuda:
-        window = window.cuda(img1.get_device())
+    window = window.to(device)
     window = window.type_as(img1)
 
     return _ssim(img1, img2, window, window_size, channel, size_average)
