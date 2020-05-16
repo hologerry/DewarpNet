@@ -152,8 +152,6 @@ def train(args):
         val_ssim_loss = 0.0
 
         for i_val, (images_val, gt_bms_val) in tqdm(enumerate(val_loader)):
-            if i_val < 80:
-                continue
             with torch.no_grad():
                 images_val = images_val.to(device)
                 gt_bms_val = gt_bms_val.to(device)
