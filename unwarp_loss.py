@@ -18,7 +18,7 @@ def unwarp(img, bm):
     bm = F.interpolate(bm, size=(h, w), mode='bilinear', align_corners=True)
     # print bm.shape
 
-    img = img.double()
+    # img = img.double()
     bm = bm.transpose(1, 2).transpose(2, 3)  # NCHW -> NHWC
     res = F.grid_sample(input=img, grid=bm)
     return res
@@ -50,7 +50,7 @@ class UnwarpLoss(torch.nn.Module):
         # pred_bm[:,:,:,1]=pred_bm[:,:,:,1]/float(448.0)
         # pred_bm=(pred_bm-0.5)*2
         # no need denormalize, in favor of grid_sample
-        pred_bm = pred_bm.double()
+        # pred_bm = pred_bm.double()
 
         # denormalize ground_bm
         # ground_bm=(ground_bm/2.0)+0.5
@@ -61,7 +61,7 @@ class UnwarpLoss(torch.nn.Module):
         # ground_bm=(ground_bm-0.5)*2
 
         # no need denormalize, in favor of grid_sample
-        ground_bm = ground_bm.double()
+        # ground_bm = ground_bm.double()
 
         uwpred = unwarp(inp_img, pred_bm)
         uwground = unwarp(inp_img, ground_bm)
