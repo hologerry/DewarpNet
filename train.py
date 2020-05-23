@@ -4,12 +4,13 @@ import argparse
 import os
 
 import torch
-import torch.nn as nn
+# import torch.nn as nn
 from tensorboardX import SummaryWriter
 from torch.utils import data
 from tqdm import tqdm
 
 from unwarp_loss import UnwarpLoss
+from docunet_loss import DocUnetLoss
 from datasets import get_dataset
 from models import get_model
 from utils import get_lr, show_unwarp_tnsboard
@@ -46,9 +47,10 @@ def train(args):
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 
     # Losses
-    l1_loss_fn = nn.L1Loss().to(device)
-    l2_loss_fn = nn.MSELoss().to(device)
-    unwarp_loss_fn = UnwarpLoss().to(device)
+    # l1_criterion = nn.L1Loss().to(device)
+    # l2_criterion = nn.MSELoss().to(device)
+    unwarp_criterion = UnwarpLoss().to(device)
+    docunet_criterion = DocUnetLoss().to(device)
 
     epoch_start = 0
     if args.resume is not None:
@@ -105,16 +107,18 @@ def train(args):
             optimizer.zero_grad()
             pred_bms = model(images)
 
-            l1_loss = l1_loss_fn(pred_bms, gt_bms)
-            l2_loss = l2_loss_fn(pred_bms, gt_bms)
-            recon_loss, ssim_loss, uwpredict, uwground = unwarp_loss_fn(images, pred_bms, gt_bms)
-            loss = (10.0 * l1_loss) + (5.0 * l2_loss) + (5.0 * recon_loss)  # + (3.0 * ssim_loss)
+            # l1_loss = l1_criterion(pred_bms, gt_bms)
+            # l2_loss = l2_criterion(pred_bms, gt_bms)
+            docunet_loss = docunet_criterion(pred_bms, gt_bms)
+            recon_loss, ssim_loss, uwpredict, uwground = unwarp_criterion(images, pred_bms, gt_bms)
+            # loss = (10.0 * l1_loss) + (5.0 * l2_loss) + (5.0 * recon_loss)  # + (3.0 * ssim_loss)
+            loss = docunet_loss + 0.01 * recon_loss
             # loss = l1_loss
             avg_loss += loss.item()
-            avg_l1_loss += l1_loss.item()
+            # avg_l1_loss += l1_loss.item()
             avg_recon_loss += recon_loss.item()
-            avg_ssim_loss += ssim_loss.item()
-            avg_mse_loss += l2_loss.item()
+            # avg_ssim_loss += ssim_loss.item()
+            # avg_mse_loss += l2_loss.item()
 
             loss.backward()
             optimizer.step()
@@ -132,14 +136,15 @@ def train(args):
                                      'Train Input', 'Train Pred Unwarp', 'Train GT Unwarp')
                 writer.add_scalar('BM: L1 Loss/train', avg_l1_loss/(i+1), global_step)
                 writer.add_scalar('CB: Recon Loss/train', avg_recon_loss/(i+1), global_step)
-                writer.add_scalar('CB: SSIM Loss/train', avg_ssim_loss/(i+1), global_step)
+                # writer.add_scalar('CB: SSIM Loss/train', avg_ssim_loss/(i+1), global_step)
 
-        avg_ssim_loss = avg_ssim_loss/len(train_loader)
+        # avg_ssim_loss = avg_ssim_loss/len(train_loader)
         avg_recon_loss = avg_recon_loss/len(train_loader)
-        avg_l1_loss = avg_l1_loss/len(train_loader)
-        avg_mse_loss = avg_mse_loss/len(train_loader)
-        print(f"Training L1: {avg_l1_loss:.4f}")
-        print(f"Training MSE: {avg_mse_loss}")
+        # avg_l1_loss = avg_l1_loss/len(train_loader)
+        # avg_mse_loss = avg_mse_loss/len(train_loader)
+        print(f"Training avg loss: {avg_loss:.4f}")
+        # print(f"Training L1: {avg_l1_loss:.4f}")
+        # print(f"Training MSE: {avg_mse_loss}")
         train_losses = [avg_l1_loss, avg_mse_loss, avg_recon_loss, avg_ssim_loss]
         lr = get_lr(optimizer)
         write_log_file(log_file, train_losses, epoch+1, lr, 'Train')
@@ -150,37 +155,43 @@ def train(args):
         val_mse_loss = 0.0
         val_recon_loss = 0.0
         val_ssim_loss = 0.0
+        val_docunet_loss = 0.0
 
         for i_val, (images_val, gt_bms_val) in tqdm(enumerate(val_loader)):
             with torch.no_grad():
                 images_val = images_val.to(device)
                 gt_bms_val = gt_bms_val.to(device)
                 pred_bms_val = model(images_val)
-                l1_loss_val = l1_loss_fn(pred_bms_val, gt_bms_val)
-                l2_loss_val = l2_loss_fn(pred_bms_val, gt_bms_val)
-                recon_loss_val, ssim_loss_val, uwpred_val, uwground_val = unwarp_loss_fn(images_val, pred_bms_val, gt_bms_val)
+                # l1_loss_val = l1_criterion(pred_bms_val, gt_bms_val)
+                # l2_loss_val = l2_criterion(pred_bms_val, gt_bms_val)
+                recon_loss_val, ssim_loss_val, uwpred_val, uwground_val = unwarp_criterion(images_val, pred_bms_val, gt_bms_val)
+                docunet_loss_val = docunet_criterion(pred_bms_val, gt_bms_val)
 
-                val_l1_loss += l1_loss_val.item()
-                val_recon_loss += recon_loss_val.item()
-                val_ssim_loss += ssim_loss_val.item()
-                val_mse_loss += l2_loss_val.item()
+                # val_l1_loss += l1_loss_val.item()
+                # val_recon_loss += recon_loss_val.item()
+                # val_ssim_loss += ssim_loss_val.item()
+                # val_mse_loss += l2_loss_val.item()
+                val_docunet_loss += docunet_loss_val.item()
             if args.tboard:
                 show_unwarp_tnsboard(epoch+1, writer, images_val.detach().cpu(), uwpred_val.detach().cpu(), uwground_val.detach().cpu(), 8,
                                      'Val Input', 'Val Pred Unwarp', 'Val GT Unwarp')
 
-        val_l1_loss = val_l1_loss/len(val_loader)
-        val_mse_loss = val_mse_loss/len(val_loader)
-        val_ssimloss = val_ssim_loss/len(val_loader)
+        # val_l1_loss = val_l1_loss/len(val_loader)
+        # val_mse_loss = val_mse_loss/len(val_loader)
+        # val_ssimloss = val_ssim_loss/len(val_loader)
         val_recon_loss = val_recon_loss/len(val_loader)
-        print(f"val loss at epoch {epoch+1}: {val_l1_loss}")
-        print(f"val mse: {val_mse_loss}")
+        val_docunet_loss = val_docunet_loss/len(val_loader)
+        # print(f"val loss at epoch {epoch+1}: {val_l1_loss}")
+        # print(f"val mse: {val_mse_loss}")
+        print(f"val docunet: {val_docunet_loss}")
         val_losses = [val_l1_loss, val_mse_loss, val_recon_loss, val_ssim_loss]
         write_log_file(log_file, val_losses, epoch+1, lr, 'Val')
         if args.tboard:
             # log the val losses
-            writer.add_scalar('BM: L1 Loss/val', val_l1_loss, epoch+1)
-            writer.add_scalar('CB: Recon Loss/val', val_recon_loss, epoch+1)
-            writer.add_scalar('CB: SSIM Loss/val', val_ssimloss, epoch+1)
+            # writer.add_scalar('BM: L1 Loss/val', val_l1_loss, epoch+1)
+            # writer.add_scalar('CB: Recon Loss/val', val_recon_loss, epoch+1)
+            # writer.add_scalar('CB: SSIM Loss/val', val_ssimloss, epoch+1)
+            writer.add_scalar('CB: DocUnet Loss/val', val_docunet_loss, epoch+1)
 
         # reduce learning rate
         sched.step(val_mse_loss)
@@ -211,7 +222,7 @@ if __name__ == '__main__':
                         help='Height of the input image')
     parser.add_argument('--img_cols', type=int, default=128,
                         help='Width of the input image')
-    parser.add_argument('--experiment_name', type=str, default='unet_img_bm')
+    parser.add_argument('--experiment_name', type=str, default='unet_img_bm_docunet_loss')
     parser.add_argument('--n_epoch', type=int, default=100,
                         help='# of the epochs')
     parser.add_argument('--batch_size', type=int, default=256,
