@@ -19,8 +19,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def unwarp(img, bm):
     w, h = img.shape[0], img.shape[1]
     bm = bm.transpose(1, 2).transpose(2, 3).detach().cpu().numpy()[0, :, :, :]
-    bm0 = cv2.blur(bm[:, :, 0], (3, 3))
-    bm1 = cv2.blur(bm[:, :, 1], (3, 3))
+    bm0 = cv2.blur(bm[:, :, 0], (35, 35))
+    bm1 = cv2.blur(bm[:, :, 1], (35, 35))
     bm0 = cv2.resize(bm0, (h, w))
     bm1 = cv2.resize(bm1, (h, w))
     bm = np.stack([bm0, bm1], axis=-1)
@@ -83,7 +83,7 @@ def test(args, img_path, fname):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Params')
     parser.add_argument('--model_path', type=str,
-                        default='',
+                        default='experiments/unet_img_bm/checkpoint/unet_95_0.0007021352923439569_0.00010624950948643147_best_model.pth',
                         help='Path to the saved image bm model')
     parser.add_argument('--img_path', type=str, default='./eval/input/',
                         help='Path of the input image')
