@@ -20,7 +20,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def write_log_file(log_file, losses, epoch, lr, phase):
-    log_file.write(f"\n{phase} LRate: {lr} Epoch: {epoch} Loss: {losses[0]} MSE: {losses[1]} UnwarpL2: {losses[2]} UnwarpSSIM: {losses[3]}\n")
+    # log_file.write(f"\n{phase} LRate: {lr} Epoch: {epoch} Loss: {losses[0]} MSE: {losses[1]} UnwarpL2: {losses[2]} UnwarpSSIM: {losses[3]}\n")
+    log_file.write(f"\n{phase} LRate: {lr} Epoch: {epoch} DocUnetLoss: {losses[0]} ReconLoss: {losses[1]}\n")
 
 
 def train(args):
@@ -32,8 +33,8 @@ def train(args):
                           split='val', img_size=(args.img_rows, args.img_cols))
 
     n_classes = train_dataset.n_classes
-    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=64, shuffle=True)
-    val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size, num_workers=64)
+    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = data.DataLoader(val_dataset, batch_size=args.batch_size)
 
     # Setup Model
     model = get_model(args.arch, n_classes, in_channels=3)
@@ -96,17 +97,17 @@ def train(args):
 
     for epoch in range(epoch_start, args.n_epoch):
         avg_loss = 0.0
-        avg_l1_loss = 0.0
+        # avg_l1_loss = 0.0
         avg_recon_loss = 0.0
-        avg_ssim_loss = 0.0
-        avg_mse_loss = 0.0
+        # avg_ssim_loss = 0.0
+        # avg_mse_loss = 0.0
+        avg_docunet_loss = 0.0
         model.train()
         for i, (images, gt_bms) in enumerate(train_loader):
             images = images.to(device)
             gt_bms = gt_bms.to(device)
             optimizer.zero_grad()
             pred_bms = model(images)
-
             # l1_loss = l1_criterion(pred_bms, gt_bms)
             # l2_loss = l2_criterion(pred_bms, gt_bms)
             docunet_loss = docunet_criterion(pred_bms, gt_bms)
@@ -119,6 +120,7 @@ def train(args):
             avg_recon_loss += recon_loss.item()
             # avg_ssim_loss += ssim_loss.item()
             # avg_mse_loss += l2_loss.item()
+            avg_docunet_loss += docunet_loss.item()
 
             loss.backward()
             optimizer.step()
@@ -134,27 +136,32 @@ def train(args):
             if args.tboard and (i+1) % 20 == 0:
                 show_unwarp_tnsboard(global_step, writer, images.detach().cpu(), uwpredict.detach().cpu(), uwground.detach().cpu(), 8,
                                      'Train Input', 'Train Pred Unwarp', 'Train GT Unwarp')
-                writer.add_scalar('BM: L1 Loss/train', avg_l1_loss/(i+1), global_step)
-                writer.add_scalar('CB: Recon Loss/train', avg_recon_loss/(i+1), global_step)
-                # writer.add_scalar('CB: SSIM Loss/train', avg_ssim_loss/(i+1), global_step)
+                writer.add_scalar('AVG Loss/train', avg_loss/(i+1), global_step)
+                # writer.add_scalar('L1 Loss/train', avg_l1_loss/(i+1), global_step)
+                writer.add_scalar('Recon Loss/train', avg_recon_loss/(i+1), global_step)
+                writer.add_scalar('Docunet Loss/train', avg_docunet_loss/(i+1), global_step)
+                # writer.add_scalar('SSIM Loss/train', avg_ssim_loss/(i+1), global_step)
 
         # avg_ssim_loss = avg_ssim_loss/len(train_loader)
+        # avg_loss = avg_loss/len(train_loader)
         avg_recon_loss = avg_recon_loss/len(train_loader)
         # avg_l1_loss = avg_l1_loss/len(train_loader)
         # avg_mse_loss = avg_mse_loss/len(train_loader)
+        avg_docunet_loss = avg_docunet_loss/len(train_loader)
         print(f"Training avg loss: {avg_loss:.4f}")
         # print(f"Training L1: {avg_l1_loss:.4f}")
         # print(f"Training MSE: {avg_mse_loss}")
-        train_losses = [avg_l1_loss, avg_mse_loss, avg_recon_loss, avg_ssim_loss]
+
+        train_losses = [avg_docunet_loss, avg_recon_loss]
         lr = get_lr(optimizer)
         write_log_file(log_file, train_losses, epoch+1, lr, 'Train')
 
         model.eval()
         # val_loss = 0.0
-        val_l1_loss = 0.0
-        val_mse_loss = 0.0
+        # val_l1_loss = 0.0
+        # val_mse_loss = 0.0
         val_recon_loss = 0.0
-        val_ssim_loss = 0.0
+        # val_ssim_loss = 0.0
         val_docunet_loss = 0.0
 
         for i_val, (images_val, gt_bms_val) in tqdm(enumerate(val_loader)):
@@ -168,7 +175,7 @@ def train(args):
                 docunet_loss_val = docunet_criterion(pred_bms_val, gt_bms_val)
 
                 # val_l1_loss += l1_loss_val.item()
-                # val_recon_loss += recon_loss_val.item()
+                val_recon_loss += recon_loss_val.item()
                 # val_ssim_loss += ssim_loss_val.item()
                 # val_mse_loss += l2_loss_val.item()
                 val_docunet_loss += docunet_loss_val.item()
@@ -184,30 +191,31 @@ def train(args):
         # print(f"val loss at epoch {epoch+1}: {val_l1_loss}")
         # print(f"val mse: {val_mse_loss}")
         print(f"val docunet: {val_docunet_loss}")
-        val_losses = [val_l1_loss, val_mse_loss, val_recon_loss, val_ssim_loss]
+        # val_losses = [val_l1_loss, val_mse_loss, val_recon_loss, val_ssim_loss]
+        val_losses = [val_docunet_loss, val_recon_loss]
         write_log_file(log_file, val_losses, epoch+1, lr, 'Val')
         if args.tboard:
             # log the val losses
             # writer.add_scalar('BM: L1 Loss/val', val_l1_loss, epoch+1)
-            # writer.add_scalar('CB: Recon Loss/val', val_recon_loss, epoch+1)
-            # writer.add_scalar('CB: SSIM Loss/val', val_ssimloss, epoch+1)
-            writer.add_scalar('CB: DocUnet Loss/val', val_docunet_loss, epoch+1)
+            writer.add_scalar('Recon Loss/val', val_recon_loss, epoch+1)
+            # writer.add_scalar('SSIM Loss/val', val_ssimloss, epoch+1)
+            writer.add_scalar('DocUnet Loss/val', val_docunet_loss, epoch+1)
 
         # reduce learning rate
-        sched.step(val_mse_loss)
+        sched.step(val_docunet_loss)
 
-        if val_mse_loss < best_val_mse_loss:
-            best_val_mse_loss = val_mse_loss
+        if val_docunet_loss < best_val_mse_loss:
+            best_val_mse_loss = val_docunet_loss
             state = {'epoch': epoch+1,
                      'model_state': model.module.state_dict(),
                      'optimizer_state': optimizer.state_dict(), }
-            torch.save(state, os.path.join(checkpoint_dir, f"{args.arch}_{epoch+1}_{val_mse_loss}_{avg_mse_loss}_best_model.pth"))
+            torch.save(state, os.path.join(checkpoint_dir, f"{args.arch}_{epoch+1}_{val_docunet_loss}_best_model.pth"))
 
         if (epoch+1) % 10 == 0:
             state = {'epoch': epoch+1,
                      'model_state': model.module.state_dict(),
                      'optimizer_state': optimizer.state_dict(), }
-            torch.save(state, os.path.join(checkpoint_dir, f"{args.arch}_{epoch+1}_{val_mse_loss}_{avg_mse_loss}_model.pth"))
+            torch.save(state, os.path.join(checkpoint_dir, f"{args.arch}_{epoch+1}_{val_docunet_loss}_model.pth"))
 
     log_file.close()
 
@@ -225,7 +233,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment_name', type=str, default='unet_img_bm_docunet_loss')
     parser.add_argument('--n_epoch', type=int, default=100,
                         help='# of the epochs')
-    parser.add_argument('--batch_size', type=int, default=256,
+    parser.add_argument('--batch_size', type=int, default=64,
                         help='Batch Size')
     parser.add_argument('--lr', type=float, default=1e-4,
                         help='Learning Rate')

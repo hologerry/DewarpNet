@@ -47,7 +47,7 @@ class IMGBMDataset(data.Dataset):
         # 1/824_8-cp_Page_0503-7Nw0001
         im_name = self.files[self.split][index]
 
-        im_path = pjoin(self.root, 'img',  im_name + '.png')
+        im_path = pjoin(self.root, 'img', im_name + '.png')
         im = Image.open(im_path).convert('RGB')
 
         bm_path = pjoin(self.root, 'bm', im_name + '.mat')

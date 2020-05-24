@@ -2,7 +2,7 @@ import os
 
 root_dir = '/root/doc3d'
 train_f = open(os.path.join(root_dir, 'train.txt'), 'w')
-for i in range(1, 17):
+for i in range(1, 8):
     cur_path = os.path.join(root_dir, 'img', str(i))
     names = os.listdir(cur_path)
     for name in names:
@@ -11,7 +11,7 @@ for i in range(1, 17):
 
 
 val_f = open(os.path.join(root_dir, 'val.txt'), 'w')
-for i in range(17, 22):
+for i in range(8, 11):
     cur_path = os.path.join(root_dir, 'img', str(i))
     names = os.listdir(cur_path)
     for name in names:
